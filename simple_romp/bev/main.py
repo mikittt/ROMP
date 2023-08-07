@@ -1,5 +1,7 @@
 
 import cv2
+import json
+import shutil
 import numpy as np
 import os, sys
 import os.path as osp
@@ -32,6 +34,8 @@ def bev_settings(input_args=sys.argv[1:]):
     parser.add_argument('-o', '--save_path', type=str, default=osp.join(osp.expanduser("~"),'BEV_results'), help = 'Path to save the results')
     parser.add_argument('--crowd', action='store_false', help = 'Whether to process the input as a long image, sliding window way')
     parser.add_argument('--GPU', type=int, default=0, help = 'The gpu device number to run the inference on. If GPU=-1, then running in cpu mode')
+    parser.add_argument('--json_file', type=str, default=None)
+    parser.add_argument('--output_path', type=str, default=None)
 
     parser.add_argument('--overlap_ratio', type=float, default=long_conf_dict[model_id][3], help = 'The frame_rate of saved video results')
     parser.add_argument('--center_thresh', type=float, default=conf_dict[model_id][0], help = 'The confidence threshold of positive detection in 2D human body center heatmap.')
@@ -46,7 +50,7 @@ def bev_settings(input_args=sys.argv[1:]):
     parser.add_argument('--show_items', type=str, default='mesh,mesh_bird_view', help = 'The items to visualized, including mesh,pj2d,j3d,mesh_bird_view,mesh_side_view,center_conf,rotate_mesh. splited with ,')
     parser.add_argument('--save_video', action='store_true', help = 'Whether to save the video results')
     parser.add_argument('--frame_rate', type=int, default=24, help = 'The frame_rate of saved video results')
-    parser.add_argument('--smpl_path', type=str, default=osp.join(osp.expanduser("~"),'.romp','SMPLA_NEUTRAL.pth'), help = 'The path of SMPL-A model file')
+    parser.add_argument('--smpl_path', type=str, default=osp.join(osp.expanduser("~"),'.romp','smpla_packed_info.pth'), help = 'The path of SMPL-A model file')
     parser.add_argument('--smil_path', type=str, default=osp.join(osp.expanduser("~"),'.romp','smil_packed_info.pth'), help = 'The path of SMIL model file')
     parser.add_argument('--model_path', type=str, default=osp.join(osp.expanduser("~"),'.romp',model_dict[model_id]), help = 'The path of BEV checkpoint')
 
@@ -68,13 +72,11 @@ def bev_settings(input_args=sys.argv[1:]):
     if args.render_mesh or args.show_largest:
         args.calc_smpl = True
     if not os.path.exists(args.smpl_path):
-        print('please prepare SMPL model files following instructions at https://github.com/Arthur151/ROMP/blob/master/simple_romp/README.md#installation')
-        #smpl_url = 'https://github.com/Arthur151/ROMP/releases/download/V2.0/smpla_packed_info.pth'
-        #download_model(smpl_url, args.smpl_path, 'SMPL-A')
+        smpl_url = 'https://github.com/Arthur151/ROMP/releases/download/V2.0/smpla_packed_info.pth'
+        download_model(smpl_url, args.smpl_path, 'SMPL-A')
     if not os.path.exists(args.smil_path):
-        print('please prepare SMIL model files following instructions at https://github.com/Arthur151/ROMP/blob/master/simple_romp/README.md#installation')
-        #smil_url = 'https://github.com/Arthur151/ROMP/releases/download/V2.0/smil_packed_info.pth'
-        #download_model(smil_url, args.smil_path, 'SMIL')
+        smil_url = 'https://github.com/Arthur151/ROMP/releases/download/V2.0/smil_packed_info.pth'
+        download_model(smil_url, args.smil_path, 'SMIL')
     if not os.path.exists(args.model_path):
         romp_url = 'https://github.com/Arthur151/ROMP/releases/download/V2.0/'+model_dict[model_id]
         download_model(romp_url, args.model_path, 'BEV')
@@ -289,34 +291,52 @@ class BEV(nn.Module):
 def main():
     args = bev_settings()
     bev = BEV(args)
-    if args.mode == 'image':
-        saver = ResultSaver(args.mode, args.save_path)
-        image = cv2.imread(args.input)
-        outputs = bev(image)
-        saver(outputs, args.input, prefix=f'{args.center_thresh}')
-    
-    if args.mode == 'video':
-        frame_paths, video_save_path = collect_frame_path(args.input, args.save_path)
-        saver = ResultSaver(args.mode, args.save_path)
-        for frame_path in progress_bar(frame_paths):
-            image = cv2.imread(frame_path)
+    if args.json_file is not None:
+        with open(args.json_file) as f:
+            data = json.load(f)
+        fin_save_id = args.json_file[4]
+        fin_save_dir = os.path.join(args.output_path, 'dir'+fin_save_id)
+        for one_file in data:
+            if os.path.exists(args.save_path):
+                shutil.rmtree(args.save_path)
+            try:
+                frame_paths, video_save_path = collect_frame_path(one_file, args.save_path)
+                saver = ResultSaver(args.mode, args.save_path)
+                for frame_path in progress_bar(frame_paths):
+                    image = cv2.imread(frame_path)
+                    outputs = bev(image)
+                    saver(outputs, frame_path, prefix=f'_{model_id}_{args.center_thresh}')
+                save_video_results(saver.frame_save_paths)
+                shutil.move(osp.join(args.save_path, 'video_results.npz'), osp.join(fin_save_dir, one_file.split('/')[-1].replace('.avi','.npz')))
+            except:
+                pass
+    else:
+        if args.mode == 'image':
+            saver = ResultSaver(args.mode, args.save_path)
+            image = cv2.imread(args.input)
             outputs = bev(image)
-            saver(outputs, frame_path, prefix=f'_{model_id}_{args.center_thresh}')
-        save_video_results(saver.frame_save_paths)
-        if args.save_video:
-            saver.save_video(video_save_path, frame_rate=args.frame_rate)
+            saver(outputs, args.input, prefix=f'{args.center_thresh}')
+        
+        if args.mode == 'video':
+            frame_paths, video_save_path = collect_frame_path(args.input, args.save_path)
+            saver = ResultSaver(args.mode, args.save_path)
+            for frame_path in progress_bar(frame_paths):
+                image = cv2.imread(frame_path)
+                outputs = bev(image)
+                saver(outputs, frame_path, prefix=f'_{model_id}_{args.center_thresh}')
+            save_video_results(saver.frame_save_paths)
+            if args.save_video:
+                saver.save_video(video_save_path, frame_rate=args.frame_rate)
 
-    if args.mode == 'webcam':
-        cap = WebcamVideoStream(args.webcam_id)
-        cap.start()
-        while True:
-            frame = cap.read()
-            outputs = bev(frame)
-            if cv2.waitKey(1) == 27:
-                break 
-        cap.stop()
+        if args.mode == 'webcam':
+            cap = WebcamVideoStream(args.webcam_id)
+            cap.start()
+            while True:
+                frame = cap.read()
+                outputs = bev(frame)
+                if cv2.waitKey(1) == 27:
+                    break 
+            cap.stop()
 
 if __name__ == '__main__':
     main()
-    
-    
