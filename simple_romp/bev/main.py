@@ -35,7 +35,7 @@ def bev_settings(input_args=sys.argv[1:]):
     parser.add_argument('--crowd', action='store_false', help = 'Whether to process the input as a long image, sliding window way')
     parser.add_argument('--GPU', type=int, default=0, help = 'The gpu device number to run the inference on. If GPU=-1, then running in cpu mode')
     parser.add_argument('--json_file', type=str, default=None)
-    parser.add_argument('--output_path', type=str, default=None)
+    parser.add_argument('--output_dir', type=str, default=None)
 
     parser.add_argument('--overlap_ratio', type=float, default=long_conf_dict[model_id][3], help = 'The frame_rate of saved video results')
     parser.add_argument('--center_thresh', type=float, default=conf_dict[model_id][0], help = 'The confidence threshold of positive detection in 2D human body center heatmap.')
@@ -295,7 +295,7 @@ def main():
         with open(args.json_file) as f:
             data = json.load(f)
         fin_save_id = args.json_file[4]
-        fin_save_dir = os.path.join(args.output_path, 'dir'+fin_save_id)
+        fin_save_dir = os.path.join(args.output_dir, 'dir'+fin_save_id)
         for one_file in data:
             if os.path.exists(args.save_path):
                 shutil.rmtree(args.save_path)

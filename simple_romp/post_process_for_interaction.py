@@ -16,7 +16,7 @@ def get_args() -> argparse.Namespace:
         "--id", type=int, help="Number of samples to generate", default=1
     )
     parser.add_argument(
-        "--output_path", type=str, help='None'
+        "--output_dir", type=str, help='None'
     )
     return parser.parse_args()
 
@@ -43,7 +43,7 @@ def track(trans):
     return track1, track2
 
 args = get_args()
-root_dir = args.output_path
+root_dir = args.output_dir
 smpl_parser = SMPLA_parser(
     os.path.join(os.path.expanduser("~"),'.romp','smpla_packed_info.pth'), 
     os.path.join(os.path.expanduser("~"),'.romp','smil_packed_info.pth')).to(0)
@@ -132,5 +132,5 @@ for one_file in tqdm(glob(os.path.join(root_dir, '*/*.npz'))):
             'file_name':one_file.split('/')[-1].split('.')[0]
         }
     )
-with open('merged.pkl', 'wb') as f:
+with open(os.path.join(root_dir, 'merged.pkl'), 'wb') as f:
     pickle.dump(results, f)
