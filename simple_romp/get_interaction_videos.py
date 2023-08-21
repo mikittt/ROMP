@@ -6,12 +6,12 @@ import json
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--root_path", type=str, help='NTU RGB+D root path'
+        "--dataset_path", type=str, help='NTU RGB+D root path'
     )
     return parser.parse_args()
 
 args = get_args()
-file_list = glob(os.path.join(args.root_path, '*/*.avi'))
+file_list = glob(os.path.join(args.dataset_path, 'video_dir/*/*.avi'))
 interaction_classes = [50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120]
 
 file_list = [one for one in file_list if int(one.split('A')[1][:3]) in interaction_classes]

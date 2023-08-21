@@ -13,10 +13,7 @@ from bev.post_parser import SMPLA_parser, denormalize_cam_params_to_trans
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--id", type=int, help="Number of samples to generate", default=1
-    )
-    parser.add_argument(
-        "--output_dir", type=str, help='None'
+        "--dataset_path", type=str, help='NTU RGB+D root path'
     )
     return parser.parse_args()
 
@@ -43,13 +40,13 @@ def track(trans):
     return track1, track2
 
 args = get_args()
-root_dir = args.output_dir
+root_dir = args.dataset_path
 smpl_parser = SMPLA_parser(
-    os.path.join(os.path.expanduser("~"),'.romp','smpla_packed_info.pth'), 
+    os.path.join(os.path.expanduser("~"),'.romp','SMPLA_NEUTRAL.pth'), 
     os.path.join(os.path.expanduser("~"),'.romp','smil_packed_info.pth')).to(0)
 smooth_coeff = 0.4
 results = []
-for one_file in tqdm(glob(os.path.join(root_dir, '*/*.npz'))):
+for one_file in tqdm(glob(os.path.join(root_dir, 'output', '*/*.npz'))):
     bev_result = np.load(one_file, allow_pickle=True)['results'].item()
     file_list = natsorted(bev_result.keys())
     num_per_frame = [len(bev_result[one_file]['cam_trans']) for one_file in file_list]
